@@ -1,6 +1,13 @@
-function [X_st] = mrf_align_admm3(edges_s, edges_t, W_node_st, W_edge_st, lambda, mu)
+function [X_st] = mrf_align_admm3(edges_s, edges_t,...
+    W_node_st, W_edge_st,...
+    lambda,...
+    mu)
 % A faster and simpler admm implementation
 % We do appropriate normalizations
+% lambda: tradeoff parameter for the edge potential
+% mu:     tradeoff parameter for enforcing bidirectional consistency 
+% gamma:  a hyper-parameter used to remove correspondences that are weak,
+%         i.e., node similarity is low, and 
 % Restore the pair-wise term in the matrix-form (a sparse matrix)
 W_pair = pairwise_term_generator(edges_s, edges_t, W_edge_st);
 %
@@ -8,9 +15,11 @@ W_pair = pairwise_term_generator(edges_s, edges_t, W_edge_st);
 %
 C_st = zeros(ns, nt+1);
 C_st(:,1:nt) = full(W_node_st);
+C_st(:, nt+1) = 0;
 %
 C_ts = zeros(nt, ns+1);
 C_ts(:, 1:ns) = full(W_node_st)';
+C_ts(:, ns+1) = 0;
 %
 X_st = ones(ns, nt+1)/(nt+1);
 X_ts = ones(nt, ns+1)/(ns+1);
@@ -61,14 +70,17 @@ for iter = 1:30
     s = sum(X_ts')';
     X_ts = X_ts./kron(s, ones(1,ns+1));
 end
+% Determine the vertices that do not have correspondences
+rowBounds = X_st(:, nt+1);
 X_st = X_st(:, 1:nt);
+ids = find(max(X_st') < rowBounds');
+X_st(ids, :) = 0; 
+
 % Generate the pair-wise term
 function [W_pair] = pairwise_term_generator(edges_s, edges_t, W_edge_st)
 %
 nv_s = max(max(edges_s));
-ne_s = size(edges_s, 2);
 nv_t = max(max(edges_t));
-ne_t = size(edges_t, 2);
 dim = nv_s*nv_t;
 [edgeCorres_s_ids, edgeCorres_t_ids, edgeCorres_weights] = find(W_edge_st);
 % We reuse variables to save space

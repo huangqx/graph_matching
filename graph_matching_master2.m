@@ -25,15 +25,16 @@ function [Corres] = graph_matching_master2(edges_s,...
 %   Corres: a matrix of dimension 2x|V_s|, specifiying vertex indices of
 %           correspondences
 if isfield(Para, 'flag_fast') == 1 && Para.flag_fast == 1
-    X_st = mrf_align_admm3(edges_s, edges_t, NodeSimilarity, EdgeSimilarity,...
+    X_st = mrf_align_admm_partial(edges_s, edges_t, NodeSimilarity, EdgeSimilarity,...
         Para.lambda_edge,...
-        Para.mu);
+        Para.mu,...
+        Para.gamma);
 else
     Data = mrf_align_opt_data2(edges_s, edges_t, NodeSimilarity, EdgeSimilarity);
     X_st = mrf_align_admm(Data);
 end
 
 % Round the fractional solution into an integer solution
-[ns, nt] = size(NodeSimilarity);
-rowsol = Hungarian(1-X_st);
-Corres = [1:ns; rowsol];
+remaining_vertex_ids = find(max(X_st') > 1e-2);
+rowsol = Hungarian(1-X_st(remaining_vertex_ids,:));
+Corres = [remaining_vertex_ids; rowsol];
